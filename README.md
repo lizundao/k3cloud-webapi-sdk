@@ -35,7 +35,39 @@ composer require lizundao/k3cloud-webapi-sdk
 
 ## 快速开始
 
-### 基本配置
+### 1. 安装依赖
+
+```bash
+composer install
+```
+
+### 2. 配置参数
+
+复制配置文件并修改相关参数：
+
+```bash
+cp config/config.example.ini config/config.ini
+```
+
+编辑 `config/config.ini` 文件，填入您的金蝶K3Cloud配置信息：
+
+```ini
+[config]
+; 第三方系统登录授权的账套ID
+X-KDApi-AcctID = your_account_id_here
+; 第三方系统登录授权的用户
+X-KDApi-UserName = your_username_here
+; 第三方系统登录授权的应用ID
+X-KDApi-AppID = your_app_id_here
+; 第三方系统登录授权的应用密钥
+X-KDApi-AppSec = your_app_secret_here
+; 请求的产品环境地址
+X-KDApi-ServerUrl = https://your-domain.com/k3cloud/
+; 账套语系，默认2052
+X-KDApi-LCID = 2052
+```
+
+### 3. 基本使用
 
 ```php
 <?php
@@ -44,19 +76,66 @@ require_once 'vendor/autoload.php';
 use Lizundao\K3CloudSDK\Config\Config;
 use Lizundao\K3CloudSDK\K3CloudApi;
 
-// 创建配置
-$config = new Config([
-    'server_url' => 'https://your-server.com/k3cloud/',
-    'acct_id' => 'your-account-id',
-    'username' => 'your-username',
-    'app_id' => 'your-app-id',
-    'app_secret' => 'your-app-secret',
-    'lcid' => 2052,
-    'org_num' => '100'
-]);
+// 从INI文件加载配置
+$config = Config::fromIni(__DIR__ . '/config/config.ini');
+
+// 或者直接创建配置
+// $config = new Config([
+//     'server_url' => 'https://your-server.com/k3cloud/',
+//     'acct_id' => 'your-account-id',
+//     'username' => 'your-username',
+//     'app_id' => 'your-app-id',
+//     'app_secret' => 'your-app-secret',
+//     'lcid' => 2052
+// ]);
 
 // 创建API实例
 $api = new K3CloudApi($config);
+
+// 推荐使用签名登录（更安全）
+$loginResult = $api->loginBySign(
+    $config->getAcctId(),
+    $config->getUsername(),
+    $config->getAppId(),
+    $config->getAppSecret()
+);
+
+// 检查登录结果
+$loginData = json_decode($loginResult, true);
+if ($loginData['LoginResultType'] == 1) {
+    echo "登录成功！\n";
+    
+    // 查询库存数据
+    $queryData = [
+        'FormId' => 'STK_Inventory',
+        'FilterString' => '',
+        'OrderString' => '',
+        'TopRowCount' => 10,
+        'StartRow' => 0,
+        'Limit' => 0,
+        'FieldKeys' => 'FID,FMaterialName,FQty'
+    ];
+    
+    $result = $api->executeBillQuery($queryData);
+    $data = json_decode($result, true);
+    
+    if (is_array($data) && !empty($data)) {
+        echo "查询成功，获取到 " . count($data) . " 条记录\n";
+        foreach ($data as $record) {
+            echo "物料: " . $record[1] . " (数量: " . $record[2] . ")\n";
+        }
+    }
+}
+```
+
+### 4. 运行测试
+
+```bash
+# 运行完整测试
+php test_complete.php
+
+# 查看使用示例
+php example.php
 ```
 
 ### 物料管理示例
@@ -206,6 +285,18 @@ MIT License
 ## 支持
 
 如有问题，请提交Issue或联系金蝶技术支持。
+
+## 功能特性
+
+- 🔐 **多种登录方式**: 支持签名登录、应用密钥登录、用户名密码登录
+- 📊 **完整API支持**: 支持金蝶K3Cloud所有WebAPI操作
+- 🔄 **会话管理**: 自动处理登录会话和状态维护
+- 📁 **文件上传**: 支持附件上传和下载功能
+- 🔧 **自定义调用**: 支持自定义WebAPI服务和SQL执行
+- 🏢 **单点登录**: 支持SSO V1-V4版本
+- ⚡ **高性能**: 基于cURL的HTTP客户端，支持并发请求
+- 🛡️ **错误处理**: 完善的异常处理机制
+- 📝 **配置灵活**: 支持INI文件配置和代码配置
 
 ## 项目地址
 

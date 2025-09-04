@@ -20,7 +20,7 @@ class HttpException extends \RuntimeException
      * @param int $code 异常代码
      * @param \Throwable|null $previous 前一个异常
      */
-    public function __construct(string $message = '', int $statusCode = 0, int $code = 0, \Throwable $previous = null)
+    public function __construct(string $message = '', int $statusCode = 0, int $code = 0, ?\Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
         $this->statusCode = $statusCode;

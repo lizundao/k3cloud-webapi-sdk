@@ -21,6 +21,11 @@ class HttpClient
     private $ch;
 
     /**
+     * @var string|null 会话ID
+     */
+    private $sessionId;
+
+    /**
      * 构造函数
      *
      * @param Config $config 配置对象
@@ -60,16 +65,25 @@ class HttpClient
      *
      * @param string $url 请求URL
      * @param array $data 请求数据
+     * @param string|array $postData 原始POST数据
      * @param array $headers 请求头
+     * @param bool $skipAuth 是否跳过自动添加认证头
      * @return string 响应内容
      * @throws HttpException
      */
-    public function post(string $url, array $data = [], array $headers = []): string
+    public function post(string $url, array $data = [], $postData = null, array $headers = [], bool $skipAuth = false): string
     {
-        $this->setRequestHeaders($headers);
+        $this->setRequestHeaders($headers, $skipAuth);
         curl_setopt($this->ch, CURLOPT_URL, $url);
         curl_setopt($this->ch, CURLOPT_POST, true);
-        curl_setopt($this->ch, CURLOPT_POSTFIELDS, json_encode($data));
+        
+        if ($postData !== null) {
+            // 使用原始POST数据
+            curl_setopt($this->ch, CURLOPT_POSTFIELDS, $postData);
+        } else {
+            // 使用数组数据，转换为JSON
+            curl_setopt($this->ch, CURLOPT_POSTFIELDS, json_encode($data));
+        }
         
         $response = $this->execute();
         $this->checkResponse($response);
@@ -98,22 +112,56 @@ class HttpClient
     }
 
     /**
+     * 设置会话ID
+     *
+     * @param string $sessionId 会话ID
+     */
+    public function setSessionId(string $sessionId): void
+    {
+        $this->sessionId = $sessionId;
+    }
+
+    /**
+     * 获取会话ID
+     *
+     * @return string|null
+     */
+    public function getSessionId(): ?string
+    {
+        return $this->sessionId;
+    }
+
+    /**
      * 设置请求头
      *
      * @param array $headers 请求头数组
+     * @param bool $skipAuth 是否跳过自动添加认证头
      */
-    private function setRequestHeaders(array $headers): void
+    private function setRequestHeaders(array $headers, bool $skipAuth = false): void
     {
         $defaultHeaders = [
             'Content-Type: application/json',
-            'Accept: application/json',
-            'X-KDApi-AcctID: ' . $this->config->getAcctId(),
-            'X-KDApi-UserName: ' . $this->config->getUsername(),
-            'X-KDApi-AppID: ' . $this->config->getAppId(),
-            'X-KDApi-AppSec: ' . $this->config->getAppSecret(),
-            'X-KDApi-LCID: ' . $this->config->getLcid(),
-            'X-KDApi-OrgNum: ' . $this->config->getOrgNum()
+            'Accept: application/json'
         ];
+
+        // 如果不是登录接口，添加认证头
+        if (!$skipAuth) {
+            $authHeaders = [
+                'X-KDApi-AcctID: ' . $this->config->getAcctId(),
+                'X-KDApi-UserName: ' . $this->config->getUsername(),
+                'X-KDApi-AppID: ' . $this->config->getAppId(),
+                'X-KDApi-AppSec: ' . $this->config->getAppSecret(),
+                'X-KDApi-LCID: ' . $this->config->getLcid(),
+                'X-KDApi-OrgNum: ' . $this->config->getOrgNum()
+            ];
+            
+            // 如果有会话ID，添加会话头
+            if ($this->sessionId) {
+                $authHeaders[] = 'kdservice-sessionid: ' . $this->sessionId;
+            }
+            
+            $defaultHeaders = array_merge($defaultHeaders, $authHeaders);
+        }
 
         $allHeaders = array_merge($defaultHeaders, $headers);
         curl_setopt($this->ch, CURLOPT_HTTPHEADER, $allHeaders);
@@ -149,7 +197,12 @@ class HttpClient
         $httpCode = curl_getinfo($this->ch, CURLINFO_HTTP_CODE);
         
         if ($httpCode >= 400) {
-            throw new HttpException("HTTP错误 {$httpCode}: {$response}");
+            throw new HttpException("HTTP错误 {$httpCode}: {$response}", $httpCode);
+        }
+        
+        // 检查是否是HTML错误页面
+        if (strpos($response, '<!DOCTYPE html>') !== false || strpos($response, '<html') !== false) {
+            throw new HttpException("服务器返回HTML错误页面: {$response}", $httpCode);
         }
     }
 
