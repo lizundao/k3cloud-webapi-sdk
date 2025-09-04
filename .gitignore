@@ -1,0 +1,42 @@
+# Composer
+/vendor/
+composer.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Cache
+.phpunit.cache/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config (包含敏感信息)
+config/config.ini
+
+# 保留docs目录，但忽略其中的临时文件
+docs/*.tmp
+docs/*.log
+
+# Build
+/build/
+/dist/
+
+# Tests
+/tests/coverage/
+
+# Local SDK dump (exclude from VCS)
+/SDK_PHP7.0_V8.2.0/
